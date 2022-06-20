@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SIMONE</title>
+    <link rel="stylesheet" href="style.css" type="text/css" />
+  </head>
+  <body id="myBody">
+    <span id="header" >Hi there!</span>
+    <p>Nice of you to stop by but I haven't built a page for this site yet. Feel free to check back another time :)</p>
+    <p id="signature"> - Simone</p>
+    <script src="script.js"></script>
+  </body>
+</html>

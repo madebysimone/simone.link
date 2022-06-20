@@ -1,0 +1,80 @@
+body {
+  font-family: sans-serif;
+  width: 80%;
+  /*margin-top: 40%;*/
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+  line-height: 1.6;
+  animation: 1.5s ease-in-out fadeInText;
+  background: no-repeat center center fixed; 
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+}
+#header {
+  color: rgba(1,1,1,0);
+  font-weight: bold;
+  font-size: 110pt;
+  letter-spacing: 0.2em;
+  -webkit-text-stroke-width: 5px;
+  -webkit-text-stroke-color: white;
+}
+p {
+  font-size: 24pt;
+  margin-bottom: 3%;
+  color: white;
+}
+#links {
+  
+  display: inline;
+  position:relative;
+  width:100%;
+  margin-left: 10%;
+  margin-right: 10%;
+  /* margin-top: 22.5%; */
+  
+}
+#links a{
+  
+  display: block;
+  text-decoration: none;
+  color: white;
+  font-size: 45pt;
+  margin-top: 10%;
+  margin-bottom: 10%;
+  border-style: solid;
+  padding-top: 2%;
+  padding-bottom: 2%;
+  /* border: 10px white; */
+}
+#links a:hover {
+  color: grey;
+  border-color: grey;
+  transition: ease-in-out 0.1s;
+}
+#signature {
+  float: right;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+@media screen and (max-width: 1000px) {
+  #header {
+    font-weight: bold;
+    /* font-size: 80pt; */
+  }
+  p, #signature{
+    font-size: 40pt;
+  }
+}
+
+/*animations*/
+@keyframes fadeInText {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
