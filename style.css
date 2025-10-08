@@ -1,9 +1,14 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
 body {
   font-family: sans-serif;
-  width: 80%;
-  /*margin-top: 40%;*/
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  margin: 0;
   text-align: center;
   line-height: 1.6;
   animation: 1.5s ease-in-out fadeInText;
@@ -13,14 +18,99 @@ body {
   -o-background-size: cover;
   background-size: cover;
 }
-#header {
-  color: rgba(1,1,1,0);
-  font-weight: bold;
-  font-size: 110pt;
-  letter-spacing: 0.2em;
-  -webkit-text-stroke-width: 5px;
-  -webkit-text-stroke-color: white;
+
+#welcome-splash {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
+
+#welcome-splash::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0; /* sits above the media (which are -1) but below header/down-arrow (2/3) */
+  background: rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+#header {
+  /* use a fast system font stack for personality without loading webfonts */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 900;             /* bold, impactful */
+  letter-spacing: 0.12em;       /* tighten slightly from before */
+  font-size: clamp(48px, 8.5vw, 110pt); /* responsive sizing */
+
+  /* stroke to preserve legibility over video; keep tight and efficient */
+  -webkit-text-stroke-width: 4px;
+  -webkit-text-stroke-color: rgba(255,255,255,0.95);
+
+  /* gradient fill clipped to text (uses no network resources) */
+  background: linear-gradient(120deg, #ffffff 0%, #f3f6ff 45%, #ffffff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  display: inline-block; /* allow transform and animation */
+  /* animation moved to .animate so we can trigger it when poster loads */
+
+  /* subtle soft glow for depth (cheap shadow, low blur) */
+  /* text-shadow: 0 2px 8px rgba(0,0,0,0.35); */
+
+  position: relative;
+  z-index: 2;
+  transition: top .5s ease, left .5s ease, transform .45s cubic-bezier(.2,.8,.2,1), font-size .45s ease, -webkit-text-stroke-width .45s ease;
+  will-change: transform, top, left, font-size;
+}
+
+#header .letter:last-child {
+  /* solid fill matching the arrow */
+  /* -webkit-text-fill-color: #51CB20; */
+  color: #51CB20;
+
+  /* match the outline to the same green so the letter appears unified */
+  -webkit-text-stroke-color: #51CB20;
+
+  /* remove the gradient clipping for this letter only */
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+
+  /* remove extra glow from the strobe keyframe so color is clean */
+  text-shadow: none;
+}
+
+/* trigger header zoom when JS adds .animate */
+#header.animate {
+  animation: zoomInHeader 4s ease-in-out both;
+}
+
+#header.condensed {
+  position: fixed !important;
+  top: 1rem !important;
+  left: 1rem !important; /* pinned to top-left */
+  transform: translateZ(0) scale(0.88) !important; /* slightly less reduction so text reads larger */
+  font-size: clamp(15px, 3vw, 50px) !important; /* larger min/max for condensed state */
+  letter-spacing: 0.04em !important;
+  -webkit-text-stroke-width: 2.5px !important;
+  z-index: 9999 !important;
+  background: transparent !important;
+}
+
+#header.condensed .letter { display: inline-block; transform: none; }
+
+/* ensure condensed header doesn't capture pointer events unexpectedly */
+#header.condensed { pointer-events: auto; }
+
 p {
   font-size: 24pt;
   margin-bottom: 3%;
@@ -60,14 +150,113 @@ p {
   color: rgba(0, 0, 0, 0.6);
 }
 
+/* down-arrow button under header */
+#down-wrapper { margin-top: 1.25rem; }
+#down-arrow {
+  /* large, bold white glyph with transparent background (we display a caret '^' and rotate it) */
+  border: none;
+  color: #51CB20;
+  font-size: 120px;        /* bigger, adjust to taste */
+  font-weight: 200;        
+  line-height: 1;
+  opacity: 0.95;
+
+  /* rotate the caret upside-down so '^' appears as a down-arrow */
+  transform: rotate(180deg);
+  transform-origin: center;
+
+  /* make it tappable/clickable and centered */
+  padding: 0.15em 0.3em;  /* keep hit area reasonable while staying visually clean */
+  border-radius: 6px;
+  -webkit-appearance: none; /* remove default button styling on iOS/Safari */
+  appearance: none;
+  cursor: pointer;
+  background-color: transparent;
+  box-shadow: none;
+
+  position: relative;
+  z-index: 3;
+}
+/* #down-arrow:focus { outline: 2px solid rgba(255,255,255,0.6); outline-offset: 4px; } */
+
+/* subtle bounce animation */
+@keyframes bounceY {
+  0% { transform: translateY(0) rotate(180deg); }
+  50% { transform: translateY(10%) rotate(180deg); }
+  100% { transform: translateY(0) rotate(180deg); }
+}
+#down-arrow { animation: bounceY 1.6s ease-in-out infinite; }
+
+/* keep video hidden until ready, then fade in */
+#bg {
+  opacity: 0;
+  transition: opacity 420ms ease-in-out;
+  will-change: opacity;
+  filter: brightness(0.7);
+}
+#bg.visible {
+  opacity: 1;
+}
+
+#hero-poster {
+  /* dim + blur the poster so it matches the video dimming/backdrop */
+  -webkit-filter: brightness(0.25) blur(4px);
+  filter: brightness(0.25) blur(4px);
+  will-change: filter;
+}
+
 @media screen and (max-width: 1000px) {
   #header {
-    font-weight: bold;
+    font-weight:800;
     /* font-size: 80pt; */
   }
   p, #signature{
     font-size: 40pt;
   }
+}
+
+/* Mobile adjustments: make header a bit larger and arrow even larger for easier tap/visibility */
+@media screen and (max-width: 768px) {
+  /* slightly larger header on phones, responsive but clamped */
+  #header {
+    font-size: clamp(56px, 14.5vw, 140pt);
+    letter-spacing: 0.08em;
+    -webkit-text-stroke-width: 6px; /* keep stroke visible at larger size */
+  }
+
+  /* make the down-arrow substantially larger and more tappable on mobile */
+  #down-arrow {
+    font-size: 160px;
+    font-weight: 700;
+    padding: 0.25em 0.4em; /* slightly larger hit area */
+  }
+}
+
+/* Extra tweak for very small devices */
+@media screen and (max-width: 420px) {
+  #header { font-size: clamp(48px, 16.5vw, 120pt); }
+  #down-arrow { font-size: 180px; }
+}
+
+/* Portrait-specific tweaks: move header slightly upwards and increase size for better presence */
+@media (orientation: portrait) {
+  /* nudge header up without using transform (avoids clashing with zoom animation) */
+  #header {
+    top: -8vh; /* move up 6% of viewport height */
+    font-size: clamp(120px, 20.5vw, 300pt); /* slightly larger on phones/portrait */
+    line-height: 1; /* tighten to help vertical fit */
+  }
+
+  /* reduce the arrow gap when header is nudged */
+  #down-wrapper { margin-top: 0.6rem; }
+
+  /* make the arrow bigger on orientation */
+  #down-arrow { font-size: 220px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* avoid positional shifts when user requests reduced motion */
+  #header { top: 0 !important; }
 }
 
 /*animations*/
@@ -78,4 +267,222 @@ p {
   100% {
     opacity: 1;
   }
+}
+
+/* reduce motion respect */
+@media (prefers-reduced-motion: reduce) {
+  #bg { display: none; }
+  /* avoid implicitly fetching any poster image via CSS when reduced-motion is set */
+  body { background: center/cover no-repeat; }
+  #down-arrow { animation: none; }
+  #header { text-shadow: none; -webkit-text-stroke-width: 3px; }
+}
+
+/* ensure header letters still inline-block for strobe */
+#header .letter { display: inline-block; will-change: opacity, transform; }
+
+/* zoom keyframes for header */
+@keyframes zoomInHeader {
+  0% { transform: scale(0.92); opacity: 0.0; }
+  40% { transform: scale(0.98); opacity: 0.8; }
+  100% { transform: scale(1.02); opacity: 1; }
+}
+
+/* strobe flash used earlier */
+@keyframes flash {
+  0% { opacity: 1; text-shadow: 0 0 0 rgba(255,255,255,0); }
+  50% { opacity: 0.05; text-shadow: 0 0 24px rgba(255,255,255,0.6); }
+  100% { opacity: 1; text-shadow: 0 0 0 rgba(255,255,255,0); }
+}
+
+/* Full-bleed background is set inline on the <video> for simplicity */
+.hero-overlay {
+  position: relative; z-index: 1;
+  min-height: 100svh;
+  display: grid; place-items: start;
+}
+
+/* Optional: ensure readable text over busy frames */
+.hero-overlay::before {
+  content: "";
+  position: fixed; inset: 0; z-index: -1;
+  background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.35));
+}
+
+#full-section.full-bleed {
+  width: 100%;
+  margin: 0;
+  padding: 0 1rem 3rem 1rem;
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* dim + blur the hero video behind this section */
+  background: rgba(0,0,0,0.25);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  transition: background-color .36s ease, -webkit-backdrop-filter .36s ease, backdrop-filter .36s ease;
+  color: white;
+  z-index: 2;
+  filter: brightness(0.7);
+}
+
+/* blurred/dimmed poster layer using CSS var set by JS */
+#full-section.full-bleed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1; /* behind text but above the video */
+  background-image: var(--hero-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(3px) brightness(0.7);
+  -webkit-filter: blur(3px) brightness(0.7);
+  pointer-events: none;
+}
+
+#full-section.full-bleed > .full-content { position: relative; z-index: 2; }
+
+@media (prefers-reduced-motion: reduce) {
+  #full-section.full-bleed::before { filter: none; -webkit-filter: none; }
+}
+
+/* When the next-section is explicitly revealed, intensify the dim and blur for stronger separation */
+#next-section[aria-hidden="false"] #full-section.full-bleed {
+  background: rgba(0,0,0,0.56);
+  -webkit-backdrop-filter: blur(80px);
+  backdrop-filter: blur(80px);
+}
+
+/* Respect reduced-motion preference: avoid backdrop-filter and transitions */
+@media (prefers-reduced-motion: reduce) {
+  #full-section.full-bleed,
+  #next-section[aria-hidden="false"] #full-section.full-bleed {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    transition: none;
+    background: rgba(0,0,0,0.35); /* keep a simple dim fallback */
+  }
+}
+
+/* next-section: break out of constrained body width to span full viewport */
+#next-section {
+  position: relative;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  display: block;
+}
+
+/* When revealed, make the next-section a full-viewport fixed overlay so it consumes the entire screen */
+#next-section[aria-hidden="false"] {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  z-index: 2 !important; /* above video but in normal flow */
+  display: block !important;
+  background: transparent !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* ensure inner full-content can scroll if it grows larger than the viewport */
+#next-section[aria-hidden="false"] .full-content {
+  max-height: 100vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* small reveal animation for the full-bleed container */
+#next-section[aria-hidden="false"] #full-section.full-bleed {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* when hidden, keep the overlay visually out of the way */
+#next-section[aria-hidden="true"] {
+  opacity: 0; /* invisible but still in DOM */
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #next-section[aria-hidden="false"] { transition: none !important; }
+}
+
+/* Letter slide-in animation for condensed header */
+@keyframes letterSlideIn {
+  from { transform: translateX(18px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slashesIn {
+  0% { opacity: 0; transform: translateX(-8px) scaleX(0.75) skewX(-6deg); }
+  60% { opacity: 1; transform: translateX(0) scaleX(1) skewX(0deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ensure the first letter (S) sits above the incoming letters */
+#header.condensed .letter:first-child { z-index: 6; position: relative; }
+#header.condensed .letter { z-index: 4; position: relative; }
+
+/* small injectable slashes element that appears after the S */
+#header .slashes {
+  display: inline-block;
+  margin-left: 0.08em;
+  opacity: 0;
+  transform-origin: left center;
+  font-weight: 900;
+  color: #51CB20; /* match accent */
+  -webkit-text-stroke-color: #51CB20;
+  -webkit-text-fill-color: #51CB20;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* when header is condensed we animate letters via JS; provide a CSS fallback animation */
+#header.condensed .letter.slide-fallback {
+  animation: letterSlideIn .36s cubic-bezier(.2,.8,.2,1) var(--delay,0s) forwards;
+}
+#header.condensed .slashes.slide-fallback {
+  animation: slashesIn .28s cubic-bezier(.2,.8,.2,1) var(--delay,0s) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #header.condensed .letter, #header .slashes { animation: none !important; transform: none !important; opacity: 1 !important; }
+}
+
+/* Force the // slashes to be outlined: transparent fill + stroked outline.
+   This overrides any header-specific fill/gradient rules so the slashes render
+   as stroke-only across WebKit/Chromium. Firefox will ignore text-stroke; an
+   SVG fallback can be added later if needed. */
+#header .slashes,
+#header .letter.slashes {
+  /* make sure the fill is transparent */
+  -webkit-text-fill-color: transparent !important;
+  color: currentColor !important; /* stroke color source */
+  /* apply stroke (shorthand) and force it */
+  -webkit-text-stroke: 2px currentColor !important;
+  /* ensure any text-background clipping doesn't paint a gradient */
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  /* inherit font metrics so sizing matches header letters */
+  font: inherit !important;
+  font-weight: inherit !important;
+  display: inline-block !important;
+  vertical-align: middle;
+  will-change: transform, opacity;
+}
+
+@media (max-width: 768px) {
+  #header .slashes,
+  #header .letter.slashes { -webkit-text-stroke: 1.25px currentColor !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #header .slashes,
+  #header .letter.slashes { transition: none !important; }
 }

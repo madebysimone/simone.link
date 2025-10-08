@@ -5,16 +5,603 @@
     <link rel="stylesheet" href="style.css" type="text/css" />
   </head>
   <body id="myBody">
+    <div id="welcome-splash">
+    <!-- HERO VIDEO -->
+  <video
+  id="bg"
+  playsinline muted autoplay loop
+  preload="none"
+  aria-label="Showreel background"
+  style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1">
+
+  Your browser does not support HTML5 video.
+</video>
+
+<!-- Poster fallback shown immediately until video ready -->
+<img id="hero-poster" alt="Simone — DJ/Producer poster" 
+     style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:block;" />
+
+<!-- Early, tiny script to pick and prefetch the correct poster ASAP -->
+<script>
+  (function(){
+    try {
+      // Determine portrait preference quickly (Screen Orientation API preferred)
+      var screenPortrait = (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.type === 'string')
+        ? screen.orientation.type.indexOf('portrait') === 0
+        : null;
+      var isPortrait = (screenPortrait !== null) ? screenPortrait : (window.matchMedia && window.matchMedia('(orientation: portrait)').matches);
+      var chosenPoster = isPortrait ? 'img/hero-port-poster.jpg' : 'img/hero-land-poster.jpg';
+      var posterImg = document.getElementById('hero-poster');
+      if (posterImg) posterImg.src = chosenPoster;
+      // set background for next-section
+      var fullSection = document.getElementById('full-section');
+      if (fullSection) {
+        fullSection.style.backgroundImage = 'url(' + chosenPoster + ')';
+        fullSection.style.backgroundSize = 'cover';
+        fullSection.style.backgroundRepeat = 'no-repeat';
+        fullSection.style.backgroundPosition = 'center';
+        // expose to CSS so we can paint a blurred, dimmed pseudo-layer with filters
+        fullSection.style.setProperty('--hero-bg', 'url(' + chosenPoster + ')');
+      }
+      // lightweight prefetch
+      var p = new Image(); p.src = chosenPoster;
+      // flag so main script can detect poster is already set
+      var v = document.getElementById('bg'); if (v) v.dataset.posterPrefetched = '1';
+      console.log('early poster prefetched ->', chosenPoster);
+    } catch (e) { console.warn('early poster prefetch failed', e); }
+  })();
+</script>
+
+  <noscript>
+    <img src="img/hero-land-poster.jpg" alt="Simone — DJ/Producer"
+        style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1">
+  </noscript>
+
     <span id="header" >SIMONE</span>
+
+    <!-- down-arrow: simple 'V' button that scrolls to the next content section -->
+    <div id="down-wrapper" style="text-align:center;">
+      <button id="down-arrow" aria-label="Scroll to content" type="button">^</button>
+    </div>
+    </div>
+
+    <!-- Placeholder target for the down-arrow. Replace or populate this with your next section content -->
+    <section id="next-section" tabindex="-1" aria-hidden="false">
+      <div id="full-section" class="full-bleed" role="region" aria-label="Next content section">
+        <div class="full-content">
+          <!-- Replace this with your real content -->
+          <!-- <h2 style="color:white; font-size:36px; margin:0;">More content</h2> -->
+        </div>
+      </div>
+    </section>
+
     <!-- <button type="button" onclick="document.write(width)">WIDTH</button> -->
-    <p id="paragraph">// L  I  N  K  S //</p>
+    <!-- <p id="paragraph">// L  I  N  K  S //</p>
     <div id="links">
       <a href="https://www.youtube.com/channel/UCnGa6hA18aaLkyHVkTlknNQ" class="simlinks">YouTube</a>
       <a href="https://soundcloud.com/simonethedj" class="simlinks">SoundCloud</a>
-      <!-- <a href="https://www.youtube.com/channel/UCnGa6hA18aaLkyHVkTlknNQ">SoundCloud</a> -->
-    </div>
+  
+    </div> -->
     <!-- <p id="signature"> - Simone</p> -->
-    <script src="script.js"></script>
+    <!-- <script src="script.js"></script> -->
+    <script>
+      (() => {
+        // Elements you already use
+        const body = document.getElementById('myBody');
+        const header = document.getElementById('header');
+        const paragraph = document.getElementById('paragraph');
+        const links = document.getElementById('links');
+        const simlinks = document.querySelectorAll('.simlinks');
+
+        // New: your <video id="bg"> background element from the HTML I gave you
+        const video = document.getElementById('bg');
+
+        // --- NEW: split header text into per-letter spans and animate them ---
+        function setupHeaderLetters() {
+          if (!header) return;
+          // don't re-run if already split
+          if (header.querySelector('.letter')) return;
+          const text = header.textContent || '';
+          header.textContent = '';
+          for (const ch of text) {
+            const span = document.createElement('span');
+            span.className = 'letter';
+            span.textContent = (ch === ' ') ? '\u00A0' : ch;
+            header.appendChild(span);
+          }
+        }
+
+        // Strobe-style flash that finishes within the first 3000ms after page load
+        function animateLetters(initial = true) {
+          if (!header) return;
+          const letters = Array.from(header.querySelectorAll('.letter'));
+          if (!letters.length) return;
+
+          letters.forEach((el, i) => {
+            // random start within first 0.6s so strobes feel offset
+            const delayMs = Math.random() * 600; // 0 - 600ms
+            // SLOWER strobe: longer single-strobe duration (120-220ms)
+            const duration = 0.12 + Math.random() * 0.10; // seconds
+            // compute how many iterations fit before 3000ms (3s) total window
+            const remainingMs = Math.max(0, 3000 - delayMs);
+            const maxIterations = Math.max(1, Math.floor(remainingMs / (duration * 1000)));
+            // cap iterations to avoid excessive flashes (allow up to 8 within the window)
+            const iterations = Math.min(maxIterations, 8);
+
+            // reset animation to retrigger if needed
+            el.style.animation = 'none';
+            void el.offsetWidth; // force reflow
+            // use linear timing for strobe-like feel and exact iteration counts
+            el.style.animation = `flash ${duration}s linear ${delayMs/1000}s ${iterations}`;
+          });
+        }
+
+        // Setup letters immediately so CSS can target them
+        setupHeaderLetters();
+        // strobe runs are triggered when the poster finishes loading (poster-first flow)
+        // no repeating interval: strobes only happen during the first few seconds after start
+        // --- END NEW ---
+
+        const mqMobile   = window.matchMedia('(max-width: 768px)');
+        const mqPortrait = window.matchMedia('(orientation: portrait)');
+
+        function setVideoSources() {
+          if (!video) return;
+          // prefer the Screen Orientation API when available (more reliable on some mobile browsers)
+          const screenPortrait = (screen.orientation && typeof screen.orientation.type === 'string')
+            ? screen.orientation.type.startsWith('portrait')
+            : null;
+          const isPortrait = (screenPortrait !== null) ? screenPortrait : mqPortrait.matches;
+          const isSmall = mqMobile.matches;
+
+          // runtime codec capability detection (more robust than relying on UA)
+          const can = (t) => (!!video.canPlayType) ? video.canPlayType(t) : '';
+          const supportsAV1 = !!can('video/webm; codecs="av01.0.08M.08"');
+          const supportsHEVC = !!(can('video/mp4; codecs="hvc1"') || can('video/mp4; codecs="hev1"'));
+
+          // decide preferred order: prefer AV1 when available (better compression),
+          // otherwise HEVC/MP4 if supported, otherwise try webm generic
+          let preferredFormats = [];
+          if (supportsAV1) preferredFormats.push('webm');
+          if (supportsHEVC) preferredFormats.push('mp4');
+          // always include fallbacks
+          if (!preferredFormats.includes('webm')) preferredFormats.push('webm');
+          if (!preferredFormats.includes('mp4')) preferredFormats.push('mp4');
+
+          console.log('setVideoSources: isPortrait=', isPortrait, 'isSmall=', isSmall,
+                      'supportsAV1=', supportsAV1, 'supportsHEVC=', supportsHEVC,
+                      'preferredFormats=', preferredFormats, 'screen.orientation=', screen.orientation);
+
+          // choose poster according to orientation and prefetch it BEFORE loading sources
+          const posterImg = document.getElementById('hero-poster');
+          try {
+            const chosenPoster = isPortrait ? 'img/hero-port-poster.jpg' : 'img/hero-land-poster.jpg';
+            console.log('setVideoSources: chosen poster ->', chosenPoster);
+            if (posterImg) posterImg.src = chosenPoster;
+            // set background for next-section
+            const fullSection = document.getElementById('full-section');
+            if (fullSection) {
+              fullSection.style.backgroundImage = 'url(' + chosenPoster + ')';
+              fullSection.style.backgroundSize = 'cover';
+              fullSection.style.backgroundRepeat = 'no-repeat';
+              fullSection.style.backgroundPosition = 'center';
+              // expose to CSS so we can paint a blurred, dimmed pseudo-layer with filters
+              fullSection.style.setProperty('--hero-bg', 'url(' + chosenPoster + ')');
+            }
+            // lightweight prefetch as a backup
+            const _pref = new Image(); _pref.src = chosenPoster;
+            // do not set video.poster yet; keep visual poster as the <img> overlay until video is ready
+          } catch (e) { console.warn('poster set failed', e); }
+
+          // If sources already injected, avoid re-injecting
+          if (video.dataset.sourcesInjected) return isPortrait;
+
+          // helpers: wait for poster to load (with timeout)
+          const waitForPoster = new Promise((resolve) => {
+            if (!posterImg) return resolve();
+            // already loaded
+            if (posterImg.complete && posterImg.naturalWidth > 0) return resolve();
+            let done = false;
+            const onLoad = () => { if (done) return; done = true; posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); };
+            const onError = () => { if (done) return; done = true; posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); };
+            posterImg.addEventListener('load', onLoad);
+            posterImg.addEventListener('error', onError);
+            // safety timeout (2.5s)
+            setTimeout(() => { if (done) return; done = true; posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); }, 2500);
+          });
+
+          // once poster is loaded, inject sources and start loading video
+          waitForPoster.then(() => {
+            console.log('poster loaded and header animation finished — injecting video sources');
+
+            // Trigger header animations (zoom + letter strobes) when poster finishes loading
+            try {
+              const posterImgEl = document.getElementById('hero-poster');
+              const startHeaderAnim = () => {
+                if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                if (header && !header.classList.contains('animate')) {
+                  header.classList.add('animate');
+                  // start per-letter strobes shortly after zoom begins
+                  setTimeout(() => animateLetters(true), 140);
+                }
+              };
+              // If poster was already complete, trigger immediately, otherwise wait for load
+              if (posterImgEl && posterImgEl.complete) startHeaderAnim();
+              else if (posterImgEl) posterImgEl.addEventListener('load', startHeaderAnim, { once: true });
+              else startHeaderAnim();
+            } catch (e) { console.warn('failed to trigger header animation', e); }
+
+            // map of files for each layout
+            const files = {
+              portraitSmall: { webm: 'video/hero-port-720x1280.av1.webm', mp4: 'video/hero-port-720x1280.hevc.mp4' },
+              portraitLarge: { webm: 'video/hero-port-1080x1920.av1.webm', mp4: 'video/hero-port-1080x1920.hevc.mp4' },
+              landSmall: { webm: 'video/hero-land-720.av1.webm', mp4: 'video/hero-land-720.hevc.mp4' },
+              landLarge: { webm: 'video/hero-land-1080.av1.webm', mp4: 'video/hero-land-1080.hevc.mp4' }
+            };
+
+            const srcList = [];
+            const key = isPortrait ? (isSmall ? 'portraitSmall' : 'portraitLarge') : (isSmall ? 'landSmall' : 'landLarge');
+
+            // push sources in preferred order
+            preferredFormats.forEach(fmt => {
+              const url = files[key][fmt];
+              if (url) srcList.push({ src: url, type: (fmt === 'webm') ? 'video/webm' : 'video/mp4' });
+            });
+
+            // replace existing <source> children with chosen list
+            while (video.firstChild) video.removeChild(video.firstChild);
+            srcList.forEach(s => {
+              const srcEl = document.createElement('source');
+              srcEl.src = s.src;
+              srcEl.type = s.type;
+              video.appendChild(srcEl);
+              console.log('added source', s.src);
+            });
+
+            // put fallback text node
+            const fallback = document.createTextNode('Your browser does not support HTML5 video.');
+            video.appendChild(fallback);
+
+            // mark injected so subsequent calls are no-op
+            video.dataset.sourcesInjected = '1';
+
+            // attach readiness handlers before load
+            const onReady = () => {
+              video.removeEventListener('canplaythrough', onReady);
+              video.removeEventListener('loadeddata', onReady);
+              console.log('video ready — revealing');
+              // reveal video with CSS class
+              video.classList.add('visible');
+              // optionally set video.poster now so future navigations show the poster
+              try { video.poster = posterImg ? posterImg.src : ''; } catch (e) {}
+              // hide the overlay poster after fade
+              setTimeout(() => {
+                const poster = document.getElementById('hero-poster');
+                if (poster) poster.style.display = 'none';
+              }, 520);
+            };
+
+            video.addEventListener('canplaythrough', onReady, { once: true });
+            video.addEventListener('loadeddata', onReady, { once: true });
+
+            try {
+              // start loading the video now that poster and header have had priority
+              video.load();
+              setTimeout(() => console.log('video.currentSrc after load ->', video.currentSrc), 250);
+            } catch (e) { console.warn('video.load failed', e); }
+          });
+
+          return isPortrait;
+        }
+
+        function applyLayout() {
+          // ensure correct sources for current orientation/size right away
+          setVideoSources();
+
+          // Reset any previously-applied offsets so the welcome-splash remains flush to the top
+          try {
+            body.style.marginTop = '0';
+            body.style.paddingTop = '0';
+          } catch (e) { /* ignore */ }
+
+          const h = window.innerHeight;
+
+          const newMarginTop  = Math.round(h * 0.60) + 'px';
+          const wideMarginTop = Math.round(h * 0.38) + 'px';
+
+          if (mqMobile.matches) {
+            // MOBILE: keep splash at top, but adjust link sizing
+            body.style.color = 'white';
+
+            simlinks.forEach(link => {
+              link.style.display = 'inline';
+              link.style.width = '';
+              link.style.paddingLeft = '';
+              link.style.paddingRight = '';
+              link.style.marginLeft = '';
+              link.style.marginRight = '';
+              link.style.fontSize = '20pt';
+            });
+
+          } else {
+            // DESKTOP: keep splash at top, only tweak typography and link sizing
+            if (header) {
+              header.style.fontSize = '90pt';
+              header.style.webkitTextStrokeWidth = '4px';
+            }
+            if (paragraph) paragraph.style.marginBottom = '8%';
+            if (links) links.style.paddingTop = '10%';
+
+            simlinks.forEach(link => {
+              link.style.display = 'inline';
+              link.style.width = '30%';
+              link.style.paddingLeft = '5%';
+              link.style.paddingRight = '5%';
+              link.style.marginLeft = '2.5%';
+              link.style.marginRight = '2.5%';
+              link.style.fontSize = '36pt';
+            });
+          }
+        }
+
+        // Optional: if the connection is slow, cap to 720p by swapping filenames.
+        // This assumes your 1080 variants contain "1080" or "1080x1920" in the URL,
+        // and the 720 variants use "720" or "720x1280".
+        function capOnSlowNetwork() {
+          const c = navigator.connection || navigator.webkitConnection || navigator.mozConnection;
+          if (!c || !video) return;
+
+          const slow = ['slow-2g', '2g', '3g'].includes(c.effectiveType);
+          if (!slow) return;
+
+          video.querySelectorAll('source').forEach(s => {
+            s.src = s.src
+              .replace('1080x1920', '720x1280')
+              .replace('1080', '720');
+          });
+
+          // Reload to pick up the capped sources before playback
+          const wasPaused = video.paused;
+          video.load();
+          if (!wasPaused) video.play().catch(() => {});
+        }
+
+        // Initial run + listeners
+        applyLayout();
+        capOnSlowNetwork();
+
+        // Re-apply on resize, orientationchange and mqPortrait change
+        window.addEventListener('resize', () => { applyLayout(); setVideoSources(); });
+        window.addEventListener('orientationchange', () => { console.log('orientationchange event'); applyLayout(); setVideoSources(); });
+        if (mqPortrait.addEventListener) {
+          mqPortrait.addEventListener('change', () => { console.log('mqPortrait change', mqPortrait.matches); applyLayout(); setVideoSources(); });
+        } else if (mqPortrait.addListener) {
+          // Older Safari
+          mqPortrait.addListener(() => { console.log('mqPortrait listener', mqPortrait.matches); applyLayout(); setVideoSources(); });
+        }
+
+        // Scroll to #next-section when the down-arrow is clicked (explicit target)
+        const downArrow = document.getElementById('down-arrow');
+        const nextTarget = document.getElementById('next-section');
+        if (downArrow && nextTarget) {
+          const goToNext = (ev) => {
+            if (ev) ev.preventDefault && ev.preventDefault();
+            // reveal & scroll
+            nextTarget.setAttribute('aria-hidden', 'false');
+            nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // focus after a brief delay so the browser can start the smooth scroll
+            setTimeout(() => {
+              try { nextTarget.focus({ preventScroll: false }); } catch (e) { nextTarget.focus(); }
+            }, 400);
+          };
+
+          downArrow.addEventListener('click', goToNext);
+          // keyboard activation (Enter / Space)
+          downArrow.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault(); goToNext(ev);
+            }
+          });
+        }
+
+        // Observe when the next section enters the viewport and toggle the condensed header
+        (function(){
+          const observedTarget = document.getElementById('next-section');
+          if (observedTarget && header) {
+            const observer = new IntersectionObserver((entries) => {
+              entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                  header.classList.add('condensed');
+                } else {
+                  header.classList.remove('condensed');
+                }
+              });
+            }, { root: null, rootMargin: '0px', threshold: 0.05 });
+
+            observer.observe(observedTarget);
+            // run once to set initial state
+            // IntersectionObserver will invoke the callback immediately in most browsers,
+            // but force a quick check for older environments
+            setTimeout(() => {
+              try { observer.takeRecords(); } catch (e) {}
+            }, 60);
+          }
+        })();
+
+        // When header condenses, animate letters sliding behind the S and show slashes
+        (function(){
+          const headerEl = document.getElementById('header');
+          if (!headerEl) return;
+
+          // Do not create the slashes element until we actually condense.
+          // This keeps the slashes absent during the main welcome splash.
+          let slashes = null;
+
+          const prefersReduced = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+          function createSlashes() {
+            if (slashes) return slashes;
+            slashes = document.createElement('span');
+            slashes.className = 'slashes';
+            slashes.textContent = '//';
+            // display inline-block so transforms work predictably
+            slashes.style.display = 'inline-block';
+            slashes.style.position = 'relative';
+            slashes.style.willChange = 'transform, opacity';
+            // start visually tucked slightly left (behind the S) and hidden
+            slashes.style.opacity = '0';
+            slashes.style.transform = 'translateX(-6px) scaleX(0.95)';
+            slashes.style.transition = '';
+
+            // insert after first letter if letters exist otherwise append
+            const firstLetter = headerEl.querySelector('.letter');
+            if (firstLetter && firstLetter.parentNode) firstLetter.parentNode.insertBefore(slashes, firstLetter.nextSibling);
+            else headerEl.appendChild(slashes);
+
+            return slashes;
+          }
+
+          // helper: animate letters sliding behind the S (to the left) and fading out,
+          // then slide the slashes out from behind the S to the right
+          function animateCondense() {
+            // If user prefers reduced motion, reveal immediately and skip animations
+            if (prefersReduced) {
+              headerEl.querySelectorAll('.letter').forEach(l => l.style.opacity = 1);
+              const s = createSlashes();
+              s.style.opacity = 1;
+              s.style.transform = 'none';
+              return;
+            }
+
+            // ensure header is positioned so z-index ordering works
+            headerEl.style.position = 'relative';
+
+            const letters = Array.from(headerEl.querySelectorAll('.letter'));
+            if (!letters.length) {
+              // still create slashes so condensed state shows the slashes
+              const sOnly = createSlashes();
+              sOnly.style.opacity = 1;
+              sOnly.style.transform = 'none';
+              return;
+            }
+
+            const first = letters[0];
+            if (first) {
+              first.style.position = 'relative';
+              // create an explicit stacking context on the first letter so z-index ordering
+              // remains reliable even when siblings get CSS transforms (transforms create new stacking contexts)
+              first.style.transform = 'translateZ(0)';
+              first.style.zIndex = '1000'; // keep S above other letters while they slide behind
+            }
+
+            // prepare other letters to animate behind the first letter
+            letters.forEach((el, i) => {
+              if (i === 0) return;
+              el.style.position = 'relative';
+              // ensure these are beneath the first letter
+              el.style.zIndex = '10';
+              el.style.transition = '';
+              el.style.transform = 'translateX(0)';
+              el.style.opacity = '1';
+              el.style.willChange = 'transform, opacity';
+            });
+
+            // Per-letter stagger and duration (slower, smoother)
+            const perDelay = 140; // ms between each letter start (was 100)
+            const duration = 800; // ms for each slide (was 520)
+            // fade should begin well BEFORE the letter fully reaches the S — express as fraction of duration
+            const fadeStartFraction = 0.18; // start fade at ~18% of the slide duration (earlier)
+
+            // Animate each letter one-by-one: compute required translate so it moves to tuck behind the S
+            letters.slice(1).forEach((el, idx) => {
+              const startDelay = perDelay * idx + 10;
+              setTimeout(() => {
+                // recompute bounding rects at animation start (handles layout shifts)
+                const rFirst = first.getBoundingClientRect();
+                const rEl = el.getBoundingClientRect();
+
+                // Compute a target left so the letter's CENTER aligns with the S center,
+                // then nudge slightly left so it tucks behind (small negative nudge).
+                const firstCenter = rFirst.left + (rFirst.width / 2);
+                const elCenter = rEl.left + (rEl.width / 2);
+                // target left position to center-align, then nudge left by 6px
+                const targetLeft = (firstCenter - (rEl.width / 2)) - 6;
+                const delta = Math.round(targetLeft - rEl.left);
+
+                // apply transitions and start slide
+                // shorten opacity transition so the fade is quicker and starts earlier
+                el.style.transition = `transform ${duration}ms cubic-bezier(.2,.8,.2,1), opacity ${Math.max(80, Math.round(duration * 0.35))}ms ease`;
+                el.style.transform = `translateX(${delta}px)`;
+
+                // schedule fade to start EARLIER (at fraction of slide) so the letter fades well before reaching the S
+                const fadeTime = Math.round(duration * fadeStartFraction);
+                setTimeout(() => { el.style.opacity = '0'; }, fadeTime);
+
+              }, startDelay);
+            });
+
+            // After the letters finish sliding behind S, animate the slashes sliding out from behind S
+            const lastIndex = Math.max(0, letters.length - 2); // last idx used in slice(1) loop
+            // Previously waited for the full duration + pad. Shorten the wait so slashes come out sooner.
+            // Estimate when the final letter has progressed enough (about half-to-three-quarters through)
+            // then start the slashes shortly after. This makes the slashes feel snappier.
+            const totalWait = perDelay * lastIndex + Math.round(duration * 0.48); // ms (reduced)
+
+            const s = createSlashes();
+            // keep slashes initially behind S
+            s.style.zIndex = '40';
+            s.style.opacity = '0';
+            s.style.transform = 'translateX(-6px) scaleX(0.95)';
+
+            setTimeout(() => {
+              // bring slashes forward as they slide out so they appear from in front of the S
+              s.style.zIndex = '110';
+              // slightly snappier slide and fade so the slashes feel responsive
+              s.style.transition = 'transform .36s cubic-bezier(.2,.8,.2,1), opacity .26s ease';
+              s.style.transform = 'translateX(14px)';
+              s.style.opacity = '1';
+            }, totalWait);
+          }
+
+          // helper to reset letters when un-condensed
+          function resetCondense() {
+            headerEl.querySelectorAll('.letter').forEach(el => {
+              el.style.transition = '';
+              el.style.transform = '';
+              el.style.opacity = '';
+              el.style.removeProperty('--delay');
+              el.style.position = '';
+              el.style.zIndex = '';
+              el.style.willChange = '';
+            });
+            if (slashes && slashes.parentNode) {
+              slashes.parentNode.removeChild(slashes);
+            }
+            slashes = null;
+            headerEl.style.position = '';
+            // also clear any transform/zIndex left on the first letter
+            const firstLetter = headerEl.querySelector('.letter');
+            if (firstLetter) {
+              firstLetter.style.transform = '';
+              firstLetter.style.zIndex = '';
+            }
+          }
+
+          // watch for the condensed class via MutationObserver so this works even if toggled by other code
+          const mo = new MutationObserver((muts) => {
+            muts.forEach(m => {
+              if (m.type === 'attributes' && m.attributeName === 'class') {
+                const isCondensed = headerEl.classList.contains('condensed');
+                if (isCondensed) animateCondense(); else resetCondense();
+              }
+            });
+          });
+          mo.observe(headerEl, { attributes: true, attributeFilter: ['class'] });
+
+        })();
+
+      })();
+    </script>
   </body>
   <!-- site designed and built by simone lol -->
 </html>
