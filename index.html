@@ -3,6 +3,33 @@
   <head>
     <title>SIMONE</title>
     <link rel="stylesheet" href="style.css" type="text/css" />
+    <!-- Portrait-only condensed header override: dialed back sizing for mobile -->
+    <style>
+      @media (orientation: portrait) {
+        /* Make the initial (non-condensed) header slightly larger on portrait phones */
+        #header:not(.condensed) {
+          font-size: clamp(50px, 16.5vw, 160px) !important;
+          -webkit-text-stroke-width: 4px !important;
+          line-height: 1 !important;
+        }
+        /* Slightly smaller clamp so condensed header isn't oversized on phones */
+        #header.condensed {
+          font-size: clamp(36px, 14vw, 160px) !important;
+          -webkit-text-stroke-width: 4px !important;
+          margin-left: 0.1em !important;
+        }
+        /* Slightly smaller slashes to better match the leading glyph */
+        #header.condensed .slashes {
+          font-size: 0.75em !important;
+          top: 0.04em !important;
+          /* push slashes further right from the S in condensed state */
+          margin-left: 0.16em !important;
+          /* -webkit-text-stroke-width: 8px !important; */
+        }
+        /* Ensure per-letter spans inherit header sizing and line-up */
+        #header.condensed .letter { line-height: 1 !important; }
+      }
+    </style>
   </head>
   <body id="myBody">
     <div id="welcome-splash">
@@ -456,7 +483,7 @@
             slashes.style.position = 'relative';
             slashes.style.willChange = 'transform, opacity';
             slashes.style.opacity = '0';
-            slashes.style.transform = 'translateX(-6px) scaleX(0.95)';
+            slashes.style.transform = 'translateX(-10px) scale(0.95)';
 
             // ensure inner spans are positioned on top of each other and inherit metrics
             from.style.position = 'absolute'; from.style.left = '0'; from.style.top = '0';
@@ -488,6 +515,20 @@
 
             // ensure header is positioned so z-index ordering works
             headerEl.style.position = 'relative';
+
+            // If viewport is vertical/portrait, enlarge the entire condensed header
+            // so the leading "S" and the slashes scale together. Use the existing
+            // mqPortrait media query with a Screen Orientation fallback for robustness.
+            try {
+              const screenPortrait = (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.type === 'string')
+                ? screen.orientation.type.indexOf('portrait') === 0
+                : null;
+              const isPortrait = (screenPortrait !== null) ? screenPortrait : (mqPortrait && mqPortrait.matches);
+              if (isPortrait) {
+                // Aggressive but responsive: clamp between a reasonable px range and vw
+                headerEl.style.fontSize = 'clamp(48px, 18vw, 220px)';
+              }
+            } catch (e) { /* ignore */ }
 
             const letters = Array.from(headerEl.querySelectorAll('.letter'));
             if (!letters.length) {
@@ -564,14 +605,25 @@
             // keep slashes initially behind S
             s.style.zIndex = '40';
             s.style.opacity = '0';
-            s.style.transform = 'translateX(-6px) scaleX(0.95)';
+            // default initial transform (start slightly further left so final offset reads farther)
+            s.style.transform = 'translateX(-10px) scale(0.95)';
+            s.style.transformOrigin = 'left center';
+
+            // If portrait, apply a slightly larger target scale so slashes visually match the enlarged S
+            const isPortraitNow = (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.type === 'string')
+              ? screen.orientation.type.indexOf('portrait') === 0
+              : (mqPortrait && mqPortrait.matches);
+            const portraitTargetScale = isPortraitNow ? 1.12 : 1.0;
 
             setTimeout(() => {
               // bring slashes forward as they slide out so they appear from in front of the S
               s.style.zIndex = '110';
               // slightly snappier slide and fade so the slashes feel responsive
               s.style.transition = 'transform .36s cubic-bezier(.2,.8,.2,1), opacity .26s ease';
-              s.style.transform = 'translateX(14px)';
+              // include scale in the final transform when portrait so the slashes land further from S
+              // increase translateX so the slashes stop further to the right of the S
+              const finalTranslate = 24; // px - adjusted to increase gap from the S
+              s.style.transform = `translateX(${finalTranslate}px) scale(${portraitTargetScale})`;
               s.style.opacity = '1';
 
               // when the slide/fade finishes, fade the stroke to green by adding a class on the container
@@ -605,6 +657,8 @@
             }
             slashes = null;
             headerEl.style.position = '';
+            // remove the inline mobile/portrait font-size override so normal styles resume
+            try { headerEl.style.fontSize = ''; } catch (e) {}
             // also clear any transform/zIndex left on the first letter
             const firstLetter = headerEl.querySelector('.letter');
             if (firstLetter) {
