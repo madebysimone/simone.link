@@ -137,7 +137,7 @@
         <div class="full-content">
           <div role="status" aria-live="polite" style="color: white; text-align:center;">
             <h2 style="color:white; font-size:72px; margin:0 0 0.2rem;">Content coming soon</h2>
-            <p style="color:rgba(255,255,255,0.9); margin:0; font-size:40px;">check back soon for updates. in the meantime follow simone on instagram <a href="https://instagram.com/simonethedj" style="color: aqua;">@simonethedj</a> !</p>
+            <p style="color:rgba(255,255,255,0.9); margin:0; font-size:40px;">check back soon for updates. in the meantime follow simone on instagram <a href="https://instagram.com/simonethedj" style="color: #51CB20;">@simonethedj</a> !</p>
           </div>
         </div>
       </div>
@@ -387,7 +387,7 @@
               function revealVideo() {
                 if (revealed) return;
                 revealed = true;
-                console.log('video fully buffered/ready — revealing video');
+                console.log('video ready — revealing video');
                 try {
                   // make video visible and fade it in (video was kept hidden & under poster earlier)
                   video.style.visibility = 'visible';
@@ -395,6 +395,16 @@
                   video.style.zIndex = '-1';
                   // trigger fade
                   video.style.opacity = '1';
+
+                  // Ensure playback starts when revealing. Some browsers require explicit play() after load() to begin playback.
+                  try {
+                    video.setAttribute('muted', '');
+                    video.muted = true;
+                    if (video.paused) {
+                      const p = video.play();
+                      if (p && typeof p.catch === 'function') p.catch(() => {/* ignore */});
+                    }
+                  } catch (e) { /* ignore */ }
                 } catch (e) {}
                 try { video.poster = (document.getElementById('hero-poster') || {}).src || ''; } catch (e) {}
                 // hide the overlay poster after a brief fade so the handoff is smooth
@@ -408,15 +418,25 @@
               function cleanup() {
                 try { video.removeEventListener('progress', onProgress); } catch (e) {}
                 try { video.removeEventListener('loadedmetadata', onLoadedMetadata); } catch (e) {}
+                try { video.removeEventListener('loadeddata', onLoadedData); } catch (e) {}
                 try { video.removeEventListener('error', onError); } catch (e) {}
                 try { video.removeEventListener('stalled', onProgress); } catch (e) {}
+                try { video.removeEventListener('canplay', onCanPlay); } catch (e) {}
+                try { video.removeEventListener('canplaythrough', onCanPlayThrough); } catch (e) {}
+                try { video.removeEventListener('playing', onPlaying); } catch (e) {}
                 if (bufferCheckInterval) { clearInterval(bufferCheckInterval); bufferCheckInterval = null; }
                 if (abortTimer) { clearTimeout(abortTimer); abortTimer = null; }
               }
 
               function onProgress() { if (isFullyBuffered()) revealVideo(); }
               function onLoadedMetadata() { if (isFullyBuffered()) revealVideo(); }
+              function onLoadedData() { console.log('video event: loadeddata, readyState=', video.readyState, 'networkState=', video.networkState); revealVideo(); }
               function onError(e) { console.warn('video element error', e); }
+
+              // New, more reliable events for revealing: canplay / canplaythrough / playing
+              function onCanPlay() { console.log('video event: canplay'); revealVideo(); }
+              function onCanPlayThrough() { console.log('video event: canplaythrough'); revealVideo(); }
+              function onPlaying() { console.log('video event: playing'); revealVideo(); }
 
               function startVideoLoad() {
                 if (loadingStarted || video.dataset.loadingStarted === 'canceled') return;
@@ -426,14 +446,29 @@
 
                 video.addEventListener('progress', onProgress);
                 video.addEventListener('loadedmetadata', onLoadedMetadata);
+                video.addEventListener('loadeddata', onLoadedData);
                 video.addEventListener('error', onError);
                 video.addEventListener('stalled', onProgress);
+                // Listen for more direct readiness signals
+                video.addEventListener('canplay', onCanPlay);
+                video.addEventListener('canplaythrough', onCanPlayThrough);
+                video.addEventListener('playing', onPlaying);
 
                 bufferCheckInterval = setInterval(() => { if (isFullyBuffered()) revealVideo(); }, POLL_MS);
 
                 try {
                   // initiate network activity for the chosen <source>s
+                  // allow the UA to eagerly fetch by enabling preload before load()
+                  try { video.preload = 'auto'; } catch (e) {}
                   video.load();
+
+                  // Ensure autoplay starts: some Chromium builds require an explicit play() after load()
+                  try {
+                    video.setAttribute('muted', ''); // ensure muted attribute present for autoplay policy
+                    video.muted = true; // ensure muted for autoplay policy
+                    const playPromise = video.play();
+                    if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => {/* autoplay prevented, will try again on reveal */});
+                  } catch (e) { /* ignore play errors */ }
                 } catch (e) { console.warn('video.load failed', e); }
 
                 // Abort after MAX_WAIT_MS if not revealed
@@ -445,6 +480,8 @@
                   try {
                     // remove source URLs to cancel fetches, then call load() to commit
                     Array.from(video.querySelectorAll('source')).forEach(s => { try { s.removeAttribute('src'); } catch (e) {} });
+                    // also remove src on <video> if present
+                    try { if (video.src) { video.removeAttribute('src'); } } catch (e) {}
                     video.load();
                   } catch (e) {}
                   video.dataset.loadingStarted = 'canceled';
