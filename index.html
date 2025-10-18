@@ -620,9 +620,8 @@
               s.style.zIndex = '110';
               // slightly snappier slide and fade so the slashes feel responsive
               s.style.transition = 'transform .36s cubic-bezier(.2,.8,.2,1), opacity .26s ease';
-              // include scale in the final transform when portrait so the slashes land further from S
-              // increase translateX so the slashes stop further to the right of the S
-              const finalTranslate = 24; // px - adjusted to increase gap from the S
+              // choose a larger translate for portrait (mobile) but a smaller one for desktop
+              const finalTranslate = isPortraitNow ? 24 : 14; // px
               s.style.transform = `translateX(${finalTranslate}px) scale(${portraitTargetScale})`;
               s.style.opacity = '1';
 
