@@ -443,15 +443,28 @@
             if (slashes) return slashes;
             slashes = document.createElement('span');
             slashes.className = 'slashes';
-            slashes.textContent = '//';
-            // display inline-block so transforms work predictably
+            // create two overlaid layers to cross-fade stroke color instead of animating text-stroke color
+            const from = document.createElement('span');
+            from.className = 'slash from';
+            from.textContent = '//';
+            const to = document.createElement('span');
+            to.className = 'slash to';
+            to.textContent = '//';
+
+            // container styles (minimal, CSS handles most)
             slashes.style.display = 'inline-block';
             slashes.style.position = 'relative';
             slashes.style.willChange = 'transform, opacity';
-            // start visually tucked slightly left (behind the S) and hidden
             slashes.style.opacity = '0';
             slashes.style.transform = 'translateX(-6px) scaleX(0.95)';
-            slashes.style.transition = '';
+
+            // ensure inner spans are positioned on top of each other and inherit metrics
+            from.style.position = 'absolute'; from.style.left = '0'; from.style.top = '0';
+            to.style.position = 'absolute';   to.style.left = '0';   to.style.top = '0';
+
+            // append in order: white (from) beneath green (to) so crossfade works when .to has opacity toggled
+            slashes.appendChild(from);
+            slashes.appendChild(to);
 
             // insert after first letter if letters exist otherwise append
             const firstLetter = headerEl.querySelector('.letter');
@@ -560,6 +573,19 @@
               s.style.transition = 'transform .36s cubic-bezier(.2,.8,.2,1), opacity .26s ease';
               s.style.transform = 'translateX(14px)';
               s.style.opacity = '1';
+
+              // when the slide/fade finishes, fade the stroke to green by adding a class on the container
+              function onSlashTransition(e) {
+                if (e.propertyName === 'transform' || e.propertyName === 'opacity') {
+                  s.classList.add('to-green');
+                  // also add to the container so CSS cross-fade uses the inner .slash layers
+                  s.classList.add('to-green');
+                  s.removeEventListener('transitionend', onSlashTransition);
+                }
+              }
+              s.addEventListener('transitionend', onSlashTransition);
+              // fallback: in case transitionend doesn't fire, add the class after 700ms
+              setTimeout(() => { if (s && !s.classList.contains('to-green')) s.classList.add('to-green'); }, 700);
             }, totalWait);
           }
 

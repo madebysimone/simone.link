@@ -68,7 +68,9 @@ body {
 
   position: relative;
   z-index: 2;
-  transition: top .5s ease, left .5s ease, transform .45s cubic-bezier(.2,.8,.2,1), font-size .45s ease, -webkit-text-stroke-width .45s ease;
+  /* remove font-size from the transition so the size change when condensing is abrupt and doesn't animate (prevents layout jitter)
+     keep other transitions smooth */
+  transition: top .5s ease, left .5s ease, transform .45s cubic-bezier(.2,.8,.2,1), -webkit-text-stroke-width .45s ease;
   will-change: transform, top, left, font-size;
 }
 
@@ -104,6 +106,18 @@ body {
   -webkit-text-stroke-width: 2.5px !important;
   z-index: 9999 !important;
   background: transparent !important;
+
+  /* avoid wrapping/line reflow when slashes are inserted */
+  white-space: nowrap !important;
+}
+
+/* ensure the slashes don't push layout when condensed: position them out of the inline flow */
+#header.condensed .slashes {
+  position: absolute !important;
+  /* place slashes just after the first letter visually — tweak top/left if needed */
+  left: calc(1ch) !important;
+  top: 0.05em !important;
+  margin-left: 0 !important;
 }
 
 #header.condensed .letter { display: inline-block; transform: none; }
@@ -436,22 +450,66 @@ p {
   opacity: 0;
   transform-origin: left center;
   font-weight: 900;
-  color: #51CB20; /* match accent */
-  -webkit-text-stroke-color: #51CB20;
-  -webkit-text-fill-color: #51CB20;
+
+  /* make slashes slightly smaller and keep single-line metrics */
+  font-size: 0.5em;         /* reduced from 0.9em to be a bit smaller */
+  line-height: 1;
+
+  /* use relative offset (not transform) so JS translateX doesn't wipe vertical tuning */
+  position: relative;
+  top: -0.08em;            /* lift a bit higher to better align with the S (was -0.08em) */
+
+  /* IMPORTANT: keep the fill transparent so only the stroked outline is visible. */
+  -webkit-text-fill-color: transparent !important;
+  text-fill-color: transparent !important;
+  color: currentColor !important;
   -webkit-font-smoothing: antialiased;
+  will-change: transform, opacity, top;
+  transform: translateZ(0); /* promote to compositor layer */
 }
 
-/* when header is condensed we animate letters via JS; provide a CSS fallback animation */
-#header.condensed .letter.slide-fallback {
-  animation: letterSlideIn .36s cubic-bezier(.2,.8,.2,1) var(--delay,0s) forwards;
+/* the two overlaid slash layers. absolute so they sit exactly on top of each other */
+#header .slashes .slash {
+  position: absolute;
+  left: 0; top: 0;
+  display: inline-block;
+  pointer-events: none;
+  /* keep metrics consistent with surrounding text */
+  font: inherit !important;
+  font-weight: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+
+  /* render stroke-only for WebKit/Chromium */
+  -webkit-text-fill-color: transparent !important;
+  -webkit-text-stroke: 2px currentColor !important;
+
+  /* remove text-shadow fallback to avoid any perceived fill — rely on stroke layers + opacity crossfade */
+  text-shadow: none !important;
+
+  will-change: opacity;
+  transition: opacity 420ms ease-in-out;
+  opacity: 1; /* default visible for the .from layer; the .to layer will override to 0 */
+  z-index: 0;
 }
-#header.condensed .slashes.slide-fallback {
-  animation: slashesIn .28s cubic-bezier(.2,.8,.2,1) var(--delay,0s) forwards;
+
+/* initial colors/opacities and stacking for the two layers: white beneath green */
+#header .slashes .slash.from { color: #ffffff !important; opacity: 1; z-index: 10; }
+#header .slashes .slash.to   { color: #51CB20 !important; opacity: 0; z-index: 20; }
+
+/* class applied after slide-out to fade stroke to green */
+#header .slashes.to-green,
+#header .letter.slashes.to-green {
+  color: #51CB20 !important; /* green accent */
+  /* gentle glow to reinforce the color change */
+  text-shadow: 0 0 8px rgba(81,203,32,0.28) !important;
 }
+
+/* keep the existing slide/appear behavior but ensure the container animates transform/opacity only */
+#header .slashes { transition: transform .36s cubic-bezier(.2,.8,.2,1), opacity .26s ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  #header.condensed .letter, #header .slashes { animation: none !important; transform: none !important; opacity: 1 !important; }
+  #header .slashes, #header .slashes .slash { transition: none !important; opacity: 1 !important; }
 }
 
 /* Force the // slashes to be outlined: transparent fill + stroked outline.
@@ -464,13 +522,14 @@ p {
   -webkit-text-fill-color: transparent !important;
   color: currentColor !important; /* stroke color source */
   /* apply stroke (shorthand) and force it */
-  -webkit-text-stroke: 2px currentColor !important;
+  -webkit-text-stroke: 2px white !important;
   /* ensure any text-background clipping doesn't paint a gradient */
   background: none !important;
   -webkit-background-clip: initial !important;
   background-clip: initial !important;
   /* inherit font metrics so sizing matches header letters */
   font: inherit !important;
+  font-size: 0.87em !important;
   font-weight: inherit !important;
   display: inline-block !important;
   vertical-align: middle;
@@ -485,4 +544,80 @@ p {
 @media (prefers-reduced-motion: reduce) {
   #header .slashes,
   #header .letter.slashes { transition: none !important; }
+}
+
+/* Slashes stroke color transition: use currentColor for the stroked outline so we can fade it to green */
+#header .slashes,
+#header .letter.slashes {
+  /* start with white stroke (color drives the stroke via currentColor) */
+  color: #ffffff !important;
+  -webkit-text-stroke: 2px currentColor !important;
+  /* ensure transparent fill still applies */
+  -webkit-text-fill-color: transparent !important;
+
+  /* animate color -> stroke color when the JS adds the .to-green class
+     include -webkit-text-stroke so browsers that don't expose a separate
+     stroke-color property still animate the stroke. Also animate text-shadow
+     to provide a subtle soft glow during the transition as a visual cue. */
+  transition: color 420ms ease-in-out, -webkit-text-stroke-color 420ms ease-in-out, -webkit-text-stroke 420ms ease-in-out, text-shadow 420ms ease-in-out;
+  will-change: color, text-shadow;
+}
+
+/* class applied after slide-out to fade stroke to green */
+#header .slashes.to-green,
+#header .letter.slashes.to-green {
+  color: #51CB20 !important; /* green accent */
+  /* gentle glow to reinforce the color change */
+  text-shadow: 0 0 8px rgba(81,203,32,0.28) !important;
+}
+
+/* Cross-fade stroke layers for slashes to avoid animating -webkit-text-stroke color
+   WebKit often jumps when changing stroke color; animating opacity of two overlapping
+   stroke-only layers gives a smooth, composited transition on all engines. */
+#header .slashes { 
+  position: relative; 
+  display: inline-block; 
+  transform: translateZ(0); /* promote to its own layer for smooth opacity transitions */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* the two overlaid slash layers. absolute so they sit exactly on top of each other */
+#header .slashes .slash {
+  position: absolute;
+  left: 0; top: 0;
+  display: inline-block;
+  pointer-events: none;
+  /* keep metrics consistent with surrounding text */
+  font: inherit !important;
+  font-weight: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+
+  /* render stroke-only for WebKit/Chromium */
+  -webkit-text-fill-color: transparent !important;
+  -webkit-text-stroke: 2px currentColor !important;
+
+  /* remove text-shadow fallback to avoid any perceived fill — rely on stroke layers + opacity crossfade */
+  text-shadow: none !important;
+
+  will-change: opacity;
+  transition: opacity 420ms ease-in-out;
+  opacity: 1; /* default visible for the .from layer; the .to layer will override to 0 */
+}
+
+/* initial colors/opacities for the two layers */
+#header .slashes .slash.from { color: #ffffff !important; opacity: 1; }
+#header .slashes .slash.to   { color: #51CB20 !important; opacity: 0; }
+
+/* when the container has .to-green, crossfade to the green layer */
+#header .slashes.to-green .slash.to   { opacity: 1; }
+#header .slashes.to-green .slash.from { opacity: 0; }
+
+/* keep the existing slide/appear behavior but ensure the container animates transform/opacity only */
+#header .slashes { transition: transform .36s cubic-bezier(.2,.8,.2,1), opacity .26s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  #header .slashes, #header .slashes .slash { transition: none !important; opacity: 1 !important; }
 }
