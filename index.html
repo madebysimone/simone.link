@@ -293,30 +293,107 @@
             // mark injected so subsequent calls are no-op
             video.dataset.sourcesInjected = '1';
 
-            // attach readiness handlers before load
-            const onReady = () => {
-              video.removeEventListener('canplaythrough', onReady);
-              video.removeEventListener('loadeddata', onReady);
-              console.log('video ready — revealing');
-              // reveal video with CSS class
-              video.classList.add('visible');
-              // optionally set video.poster now so future navigations show the poster
-              try { video.poster = posterImg ? posterImg.src : ''; } catch (e) {}
-              // hide the overlay poster after fade
-              setTimeout(() => {
-                const poster = document.getElementById('hero-poster');
-                if (poster) poster.style.display = 'none';
-              }, 520);
-            };
-
-            video.addEventListener('canplaythrough', onReady, { once: true });
-            video.addEventListener('loadeddata', onReady, { once: true });
-
+            // Ensure the <video> remains visually hidden and behind the poster while it buffers.
+            // Some servers return small initial byte ranges which can cause the <video> to paint
+            // a black/uninitialized frame. Force the element offscreen/transparent until we reveal it.
             try {
-              // start loading the video now that poster and header have had priority
-              video.load();
-              setTimeout(() => console.log('video.currentSrc after load ->', video.currentSrc), 250);
-            } catch (e) { console.warn('video.load failed', e); }
+              video.style.opacity = '0';
+              video.style.visibility = 'hidden';
+              // keep it beneath the poster which uses -1 z-index in the markup
+              video.style.zIndex = '-2';
+              video.style.transition = 'opacity .52s ease';
+              video.style.willChange = 'opacity';
+            } catch (e) { /* noop */ }
+
+            (function(){
+              const MAX_WAIT_MS = 45000; // abort after 45s
+              const POLL_MS = 400;
+              let bufferCheckInterval = null;
+              let abortTimer = null;
+              let loadingStarted = false;
+              let revealed = false;
+
+              function isFullyBuffered() {
+                try {
+                  const dur = video.duration;
+                  if (!isFinite(dur) || dur <= 0) return false;
+                  if (!video.buffered || video.buffered.length === 0) return false;
+                  const end = video.buffered.end(video.buffered.length - 1);
+                  return (end >= (dur - 0.25)); // small epsilon
+                } catch (e) { return false; }
+              }
+
+              function revealVideo() {
+                if (revealed) return;
+                revealed = true;
+                console.log('video fully buffered/ready — revealing video');
+                try {
+                  // make video visible and fade it in (video was kept hidden & under poster earlier)
+                  video.style.visibility = 'visible';
+                  // raise above poster so fade reads correctly (poster will be removed after fade)
+                  video.style.zIndex = '-1';
+                  // trigger fade
+                  video.style.opacity = '1';
+                } catch (e) {}
+                try { video.poster = (document.getElementById('hero-poster') || {}).src || ''; } catch (e) {}
+                // hide the overlay poster after a brief fade so the handoff is smooth
+                setTimeout(() => {
+                  const poster = document.getElementById('hero-poster');
+                  if (poster) poster.style.display = 'none';
+                }, 520);
+                cleanup();
+              }
+
+              function cleanup() {
+                try { video.removeEventListener('progress', onProgress); } catch (e) {}
+                try { video.removeEventListener('loadedmetadata', onLoadedMetadata); } catch (e) {}
+                try { video.removeEventListener('error', onError); } catch (e) {}
+                try { video.removeEventListener('stalled', onProgress); } catch (e) {}
+                if (bufferCheckInterval) { clearInterval(bufferCheckInterval); bufferCheckInterval = null; }
+                if (abortTimer) { clearTimeout(abortTimer); abortTimer = null; }
+              }
+
+              function onProgress() { if (isFullyBuffered()) revealVideo(); }
+              function onLoadedMetadata() { if (isFullyBuffered()) revealVideo(); }
+              function onError(e) { console.warn('video element error', e); }
+
+              function startVideoLoad() {
+                if (loadingStarted || video.dataset.loadingStarted === 'canceled') return;
+                loadingStarted = true;
+                video.dataset.loadingStarted = '1';
+                console.log('starting deferred video.load()');
+
+                video.addEventListener('progress', onProgress);
+                video.addEventListener('loadedmetadata', onLoadedMetadata);
+                video.addEventListener('error', onError);
+                video.addEventListener('stalled', onProgress);
+
+                bufferCheckInterval = setInterval(() => { if (isFullyBuffered()) revealVideo(); }, POLL_MS);
+
+                try {
+                  // initiate network activity for the chosen <source>s
+                  video.load();
+                } catch (e) { console.warn('video.load failed', e); }
+
+                // Abort after MAX_WAIT_MS if not revealed
+                abortTimer = setTimeout(() => {
+                  if (revealed) return;
+                  console.warn('max wait reached; aborting video load and keeping poster visible');
+                  cleanup();
+                  try { video.pause(); } catch (e) {}
+                  try {
+                    // remove source URLs to cancel fetches, then call load() to commit
+                    Array.from(video.querySelectorAll('source')).forEach(s => { try { s.removeAttribute('src'); } catch (e) {} });
+                    video.load();
+                  } catch (e) {}
+                  video.dataset.loadingStarted = 'canceled';
+                }, MAX_WAIT_MS);
+              }
+
+              // Immediately start loading now that the poster is shown — do not defer further.
+              try { startVideoLoad(); } catch (e) { console.warn('startVideoLoad failed', e); }
+
+            })();
           });
 
           return isPortrait;
