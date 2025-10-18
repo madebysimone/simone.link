@@ -30,6 +30,46 @@
         /* Ensure per-letter spans inherit header sizing and line-up */
         #header.condensed .letter { line-height: 1 !important; }
       }
+
+      /* Critical, small CSS to enforce poster-first behavior and keep UI above media */
+      /* Keep the video hidden until JS explicitly reveals it (by toggling .revealed or setting styles) */
+      #bg {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -2; /* keep behind poster */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .52s ease;
+        will-change: opacity;
+        background: transparent;
+      }
+      /* visible state applied by JS when it's safe to reveal */
+      #bg.revealed {
+        z-index: -1;
+        visibility: visible;
+        opacity: 1;
+      }
+      /* Poster image shown immediately and above the hidden video */
+      #hero-poster {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -1;
+        display: block;
+      }
+      /* helper class JS can add to hide poster after reveal */
+      #hero-poster.hidden { display: none !important; }
+
+      /* Ensure header and controls paint above media */
+      #header, #down-wrapper, #down-arrow {
+        position: relative;
+        z-index: 2;
+      }
     </style>
   </head>
   <body id="myBody">
@@ -39,15 +79,13 @@
   id="bg"
   playsinline muted autoplay loop
   preload="none"
-  aria-label="Showreel background"
-  style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1">
+  aria-label="Showreel background">
 
   Your browser does not support HTML5 video.
 </video>
 
 <!-- Poster fallback shown immediately until video ready -->
-<img id="hero-poster" alt="Simone — DJ/Producer poster" 
-     style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:block;" />
+<img id="hero-poster" alt="Simone — DJ/Producer poster" />
 
 <!-- Early, tiny script to pick and prefetch the correct poster ASAP -->
 <script>
@@ -224,18 +262,39 @@
           // If sources already injected, avoid re-injecting
           if (video.dataset.sourcesInjected) return isPortrait;
 
-          // helpers: wait for poster to load (with timeout)
+          // Ensure poster paints immediately when it finishes loading.
+          // Remove heavy blur/dim so the image reads clearly and trigger header animation.
+          if (posterImg) {
+            posterImg.addEventListener('load', function onPosterLoad() {
+              try {
+                // remove dim/blur applied in CSS to make poster clear when painted
+                posterImg.style.filter = 'none';
+                posterImg.style.webkitFilter = 'none';
+                posterImg.style.opacity = '1';
+              } catch (e) {}
+
+              // trigger the header animation now that the poster is visible
+              try {
+                if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+                  if (header && !header.classList.contains('animate')) {
+                    header.classList.add('animate');
+                    setTimeout(() => animateLetters(true), 140);
+                  }
+                }
+              } catch (e) {}
+            }, { once: true });
+          }
+
+          // helpers: wait for poster to load (no short timeout) — do NOT start video loads until the poster has actually painted.
           const waitForPoster = new Promise((resolve) => {
             if (!posterImg) return resolve();
             // already loaded
             if (posterImg.complete && posterImg.naturalWidth > 0) return resolve();
-            let done = false;
-            const onLoad = () => { if (done) return; done = true; posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); };
-            const onError = () => { if (done) return; done = true; posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); };
+            const onLoad = () => { posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); };
+            const onError = () => { posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); };
             posterImg.addEventListener('load', onLoad);
             posterImg.addEventListener('error', onError);
-            // safety timeout (2.5s)
-            setTimeout(() => { if (done) return; done = true; posterImg.removeEventListener('load', onLoad); posterImg.removeEventListener('error', onError); resolve(); }, 2500);
+            // NOTE: intentionally no short safety timeout here — we prefer to wait for the poster to finish so video loading doesn't contend for the same bandwidth.
           });
 
           // once poster is loaded, inject sources and start loading video
